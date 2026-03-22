@@ -26,8 +26,6 @@ RFC-6455/
 │   ├── server.py               # WebSocket server (Python, raw sockets)
 │   ├── client.py               # WebSocket CLI client
 │   └── Procfile                # Render deployment config
-├── docs/
-│   └── RFC_6455_WebSocket_Plan.md  # Detailed plan & PPT outline
 ├── README.md
 └── .gitignore
 ```
@@ -136,7 +134,7 @@ transformed[i] = original[i] XOR masking_key[j]
 
 ## Viva Preparation
 
-See `docs/RFC_6455_WebSocket_Plan.md` for:
+See the internal planning document for:
 - Full protocol explanation
 - PPT outline (16 slides)
 - 15+ viva questions with answers
