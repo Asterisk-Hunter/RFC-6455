@@ -822,10 +822,15 @@ class WebSocketServer:
 
 if __name__ == '__main__':
     import argparse
+    import os
+
+    # Render sets PORT env var; default to 8765 for local dev
+    default_port = int(os.environ.get('PORT', 8765))
+    default_host = '0.0.0.0' if os.environ.get('PORT') else 'localhost'
 
     parser = argparse.ArgumentParser(description='RFC 6455 WebSocket Server')
-    parser.add_argument('--host', default='localhost', help='Bind address (default: localhost)')
-    parser.add_argument('--port', type=int, default=8765, help='Bind port (default: 8765)')
+    parser.add_argument('--host', default=default_host, help='Bind address')
+    parser.add_argument('--port', type=int, default=default_port, help='Bind port')
     parser.add_argument('--ping-interval', type=int, default=30, help='Ping interval in seconds (default: 30)')
     args = parser.parse_args()
 

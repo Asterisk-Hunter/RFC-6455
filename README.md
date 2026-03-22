@@ -19,14 +19,17 @@ A from-scratch implementation of **RFC 6455 (The WebSocket Protocol)** in Python
 ## Project Structure
 
 ```
-CN-assignment/
-├── server.py                 # WebSocket server (Python, raw sockets)
-├── client.py                 # WebSocket client (Python, raw sockets)
-├── static/
-│   └── index.html            # Browser client for demo
+RFC-6455/
+├── frontend/
+│   └── index.html              # Browser chat UI (GitHub Pages)
+├── backend/
+│   ├── server.py               # WebSocket server (Python, raw sockets)
+│   ├── client.py               # WebSocket CLI client
+│   └── Procfile                # Render deployment config
 ├── docs/
-│   └── RFC_6455_WebSocket_Plan.md   # Detailed plan & PPT outline
-└── README.md                 # This file
+│   └── RFC_6455_WebSocket_Plan.md  # Detailed plan & PPT outline
+├── README.md
+└── .gitignore
 ```
 
 ## Requirements
@@ -35,59 +38,58 @@ CN-assignment/
 - No external packages (only standard library: `socket`, `hashlib`, `base64`, `struct`, `select`, `threading`)
 - Any modern web browser (Chrome, Firefox, Edge)
 
-## Quick Start
+## Local Development
 
 ### 1. Start the Server
 
 ```bash
+cd backend
 python server.py
 ```
 
-Output:
-```
-[SERVER] WebSocket server listening on ws://localhost:8765
-[SERVER] Open multiple browser tabs to test multi-client chat
-[SERVER] Press Ctrl+C to stop
-```
+### 2. Open the Frontend
 
-### 2. Connect Using Browser (Recommended for Demo)
-
-Open `static/index.html` in your browser. The page will auto-connect to the server.
+Open `frontend/index.html` in your browser. It auto-connects to `ws://localhost:8765`.
 
 Open **multiple tabs** to test multi-client broadcast.
 
-### 3. Connect Using Python Client
-
-In a **separate terminal** (keep server running):
+### 3. Or Use the CLI Client
 
 ```bash
+cd backend
 python client.py --name Alice
 ```
 
-In another terminal:
-```bash
-python client.py --name Bob
+## Deployment
+
+### Frontend → GitHub Pages
+
+1. Go to repo **Settings → Pages**
+2. Source: **Deploy from a branch**
+3. Branch: `main`, folder: `/frontend`
+4. Save → your site goes live at `https://asterisk-hunter.github.io/RFC-6455/`
+
+### Backend → Render
+
+1. Go to [render.com](https://render.com) → **New Web Service**
+2. Connect this GitHub repo
+3. Settings:
+   - **Root Directory:** `backend`
+   - **Build Command:** *(leave empty)*
+   - **Start Command:** `python server.py`
+   - **Environment:** Python 3
+4. Render auto-sets the `PORT` env var — `server.py` reads it automatically
+5. After deploy, copy your URL (e.g. `https://rfc-6455.onrender.com`)
+
+### Link Frontend ↔ Backend
+
+Open `frontend/index.html` and update this line with your Render URL:
+
+```javascript
+const RENDER_HOST = 'rfc-6455.onrender.com';
 ```
 
-Type messages and press Enter. Messages are broadcast to all connected clients.
-
-### 4. CLI Options
-
-**Server:**
-```bash
-python server.py --host 0.0.0.0 --port 9000 --ping-interval 15
-```
-
-**Client:**
-```bash
-python client.py --host localhost --port 8765 --name Charlie
-```
-
-Client commands during chat:
-- Type a message and press Enter to send
-- `/close` - Send a Close frame (proper shutdown)
-- `/quit` - Send Close and exit
-- `Ctrl+C` - Force disconnect
+Then commit and push — GitHub Pages redeploys automatically.
 
 ## How the Protocol Works
 
@@ -131,16 +133,6 @@ Client-to-server frames MUST be masked (XOR with 4-byte key). This is a security
 j = i MOD 4
 transformed[i] = original[i] XOR masking_key[j]
 ```
-
-## Demo Walkthrough
-
-1. Run `python server.py`
-2. Open browser tab 1, open browser tab 2
-3. Tab 1 sends "Hello" -> Tab 2 sees "You: Hello"
-4. Tab 2 sends "Hi!" -> Tab 1 sees "You: Hi!"
-5. Open tab 3 -> Server broadcasts "User-xxxxx connected"
-6. Close tab 1 -> Server broadcasts "User-xxxxx disconnected"
-7. Watch server logs for: handshake details, frame bytes, ping/pong timestamps
 
 ## Viva Preparation
 

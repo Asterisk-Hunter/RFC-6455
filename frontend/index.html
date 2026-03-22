@@ -224,7 +224,14 @@
     }
 
     function connect() {
-        const wsUrl = 'ws://' + window.location.hostname + ':8765';
+        // Local dev: ws://localhost:8765
+        // Deployed (GitHub Pages): wss://your-app.onrender.com
+        const RENDER_HOST = 'rfc-6455.onrender.com';
+
+        const wsUrl = window.location.hostname === 'localhost'
+            ? 'ws://localhost:8765'
+            : 'wss://' + RENDER_HOST;
+
         setStatus('CONNECTING', 'connecting');
         addMessage('Connecting to ' + wsUrl + '...', 'system');
 
