@@ -393,6 +393,7 @@ class WebSocketConnection:
         self.last_ping_time = None
         self.last_pong_time = None
         self.username = f"User-{addr[1]}"  # Simple username based on port
+        self.room = "general"  # default room
 
     def send_frame(self, opcode, payload):
         """Send a frame to this client. Server-to-client frames are NOT masked."""
@@ -584,7 +585,7 @@ class WebSocketServer:
             client_sock.close()
             return
 
-        # Read client's username frame (sent right after handshake, socket still blocking)
+        # Read client's join/name frame (sent right after handshake, socket still blocking)
         try:
             client_sock.settimeout(2.0)
             name_data = client_sock.recv(4096)
@@ -592,20 +593,25 @@ class WebSocketServer:
                 name_frame = parse_frame(name_data)
                 if name_frame and name_frame['opcode'] == OPCODE_TEXT:
                     name_payload = name_frame['payload'].decode('utf-8', errors='ignore')
-                    if name_payload.startswith('__NAME__:'):
-                        username = name_payload.split(':', 1)[1].strip()
-                        if username:
-                            conn_override_name = username
-                        else:
-                            conn_override_name = None
+                    if name_payload.startswith('__JOIN__:'):
+                        parts = name_payload.split(':', 2)
+                        conn_override_name = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
+                        conn_room = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
+                    elif name_payload.startswith('__NAME__:'):
+                        conn_override_name = name_payload.split(':', 1)[1].strip() or None
+                        conn_room = None
                     else:
                         conn_override_name = None
+                        conn_room = None
                 else:
                     conn_override_name = None
+                    conn_room = None
             else:
                 conn_override_name = None
+                conn_room = None
         except (socket.timeout, BlockingIOError, OSError):
             conn_override_name = None
+            conn_room = None
 
         # Set non-blocking
         client_sock.settimeout(None)
@@ -615,16 +621,20 @@ class WebSocketServer:
         conn = WebSocketConnection(client_sock, addr)
         if conn_override_name:
             conn.username = conn_override_name
+        if conn_room:
+            conn.room = conn_room
         self.clients[client_sock] = conn
 
         print(f"[HANDSHAKE] WebSocket connection established with {addr}")
         print(f"[HANDSHAKE]   Key: {sec_key}")
         print(f"[HANDSHAKE]   Accept: {accept_key}")
+        print(f"[HANDSHAKE]   User: {conn.username} in room: {conn.room}")
 
-        # Notify others
+        # Notify others in the same room
         self.broadcast_text(
-            f"[Server] {conn.username} connected.",
-            exclude=client_sock
+            f"[Server] {conn.username} joined room '{conn.room}'.",
+            exclude=client_sock,
+            room=conn.room
         )
 
     # =========================================================================
@@ -690,27 +700,29 @@ class WebSocketServer:
     # =========================================================================
 
     def _handle_text_frame(self, conn, payload):
-        """Feature 3: Handle incoming text message and broadcast."""
+        """Feature 3: Handle incoming text message and broadcast within room."""
         try:
             message = payload.decode('utf-8')
         except UnicodeDecodeError:
             print(f"[TEXT] Invalid UTF-8 from {conn.addr}")
             return
 
-        print(f"[TEXT] {conn.username}: {message}")
+        print(f"[TEXT] {conn.username}@{conn.room}: {message}")
 
-        # Broadcast to all other clients
+        # Broadcast to all other clients in the same room
         formatted = f"{conn.username}: {message}"
-        self.broadcast_text(formatted, exclude=conn.socket)
+        self.broadcast_text(formatted, exclude=conn.socket, room=conn.room)
 
-    def broadcast_text(self, message, exclude=None):
-        """Send a text message to all connected clients (except exclude)."""
+    def broadcast_text(self, message, exclude=None, room=None):
+        """Send a text message to all connected clients in the same room (except exclude)."""
         frame = build_frame(OPCODE_TEXT, message.encode('utf-8'), masked=False)
 
         for sock, conn in list(self.clients.items()):
             if sock == exclude:
                 continue
             if conn.state != STATE_OPEN:
+                continue
+            if room and conn.room != room:
                 continue
             try:
                 sock.sendall(frame)
@@ -775,10 +787,11 @@ class WebSocketServer:
         del self.clients[conn.socket]
         print(f"[CLOSE] Connection with {conn.addr} fully closed")
 
-        # Notify others
+        # Notify others in the same room
         self.broadcast_text(
-            f"[Server] {conn.username} disconnected.",
-            exclude=None
+            f"[Server] {conn.username} left room '{conn.room}'.",
+            exclude=None,
+            room=conn.room
         )
 
     def _remove_client(self, sock):
@@ -788,8 +801,9 @@ class WebSocketServer:
             conn.close()
             print(f"[CLOSE] Removed client {conn.addr}")
             self.broadcast_text(
-                f"[Server] {conn.username} disconnected.",
-                exclude=None
+                f"[Server] {conn.username} left room '{conn.room}'.",
+                exclude=None,
+                room=conn.room
             )
 
     # =========================================================================
