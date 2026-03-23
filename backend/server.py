@@ -561,6 +561,23 @@ class WebSocketServer:
 
         request_line, headers = parsed
 
+        # Health check for Render (plain HTTP GET without WebSocket upgrade)
+        if request_line.startswith('GET') and headers.get('upgrade', '').lower() != 'websocket':
+            print(f"[HEALTH] Health check from {addr}")
+            health_response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "OK"
+            )
+            try:
+                client_sock.sendall(health_response.encode('utf-8'))
+            except OSError:
+                pass
+            client_sock.close()
+            return
+
         # Validate handshake
         valid, reason = validate_handshake(request_line, headers)
         if not valid:
