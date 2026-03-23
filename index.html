@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFC 6455 — WebSocket</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #fafafa;
+            color: #111;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 480px;
+            max-width: 94vw;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header h1 {
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #111;
+        }
+
+        .status {
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .status.connected { color: #111; }
+        .status.disconnected { color: #999; }
+        .status.connecting { color: #666; }
+
+        .status::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .status.connected::before { background: #111; }
+        .status.disconnected::before { background: #ccc; }
+        .status.connecting::before { background: #999; }
+
+        #messages {
+            height: 380px;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            font-size: 13px;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+
+        .message.system {
+            color: #999;
+            font-size: 11px;
+            font-style: italic;
+            letter-spacing: 0.3px;
+        }
+
+        .message.sent {
+            text-align: right;
+        }
+
+        .message.sent .bubble {
+            display: inline-block;
+            background: #111;
+            color: #fff;
+            padding: 8px 14px;
+            max-width: 80%;
+            text-align: left;
+        }
+
+        .message.received .bubble {
+            display: inline-block;
+            background: #f0f0f0;
+            color: #111;
+            padding: 8px 14px;
+            max-width: 80%;
+        }
+
+        .message .sender {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #999;
+            margin-bottom: 2px;
+        }
+
+        .message.sent .sender {
+            text-align: right;
+        }
+
+        .input-area {
+            display: flex;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 16px 20px;
+            border: none;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            color: #111;
+            background: #fff;
+        }
+
+        .input-area input::placeholder {
+            color: #bbb;
+        }
+
+        .input-area button {
+            padding: 16px 24px;
+            border: none;
+            border-left: 1px solid #e0e0e0;
+            background: #fff;
+            color: #111;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .input-area button:hover {
+            background: #111;
+            color: #fff;
+        }
+
+        .footer {
+            padding: 10px 24px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 10px;
+            color: #bbb;
+            letter-spacing: 0.3px;
+        }
+
+        #messages::-webkit-scrollbar { width: 4px; }
+        #messages::-webkit-scrollbar-thumb { background: #ddd; }
+        #messages::-webkit-scrollbar-thumb:hover { background: #bbb; }
+
+        .join-body {
+            padding: 36px 28px 28px;
+            text-align: center;
+        }
+
+        .join-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #111;
+        }
+
+        .join-subtitle {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 28px;
+        }
+
+        .join-field {
+            text-align: left;
+            margin-bottom: 16px;
+        }
+
+        .join-field label {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #999;
+            margin-bottom: 6px;
+        }
+
+        .join-field input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #e0e0e0;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            color: #111;
+            background: #fafafa;
+            transition: border-color 0.15s;
+        }
+
+        .join-field input:focus {
+            border-color: #111;
+            background: #fff;
+        }
+
+        .join-field input::placeholder {
+            color: #ccc;
+        }
+
+        .join-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            background: #111;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: opacity 0.15s;
+        }
+
+        .join-btn:hover {
+            opacity: 0.85;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Join Screen -->
+<div class="container" id="joinScreen">
+    <div class="header">
+        <h1>RFC 6455</h1>
+        <span class="status disconnected">Not Joined</span>
+    </div>
+
+    <div class="join-body">
+        <div class="join-title">Join a Room</div>
+        <div class="join-subtitle">Enter your name and pick a room to start chatting</div>
+
+        <div class="join-field">
+            <label for="nameInput">Name</label>
+            <input type="text" id="nameInput" placeholder="Your name" autocomplete="off" maxlength="20">
+        </div>
+
+        <div class="join-field">
+            <label for="roomInput">Room</label>
+            <input type="text" id="roomInput" placeholder="e.g. general" autocomplete="off" maxlength="20">
+        </div>
+
+        <button class="join-btn" onclick="joinRoom()">Join</button>
+    </div>
+
+    <div class="footer">RFC 6455 &mdash; Computer Networks Lab</div>
+</div>
+
+<!-- Chat Screen -->
+<div class="container" id="chatScreen" style="display:none;">
+    <div class="header">
+        <h1 id="roomLabel">RFC 6455</h1>
+        <span id="status" class="status disconnected">Disconnected</span>
+    </div>
+
+    <div id="messages"></div>
+
+    <div class="input-area">
+        <input type="text" id="msgInput" placeholder="Type a message..." autocomplete="off">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <div class="footer">Open multiple tabs to test broadcast</div>
+</div>
+
+<script>
+    const joinScreen = document.getElementById('joinScreen');
+    const chatScreen = document.getElementById('chatScreen');
+    const nameInput = document.getElementById('nameInput');
+    const roomInput = document.getElementById('roomInput');
+    const messagesDiv = document.getElementById('messages');
+    const msgInput = document.getElementById('msgInput');
+    const statusEl = document.getElementById('status');
+    const roomLabel = document.getElementById('roomLabel');
+    let ws = null;
+    let myName = '';
+    let myRoom = '';
+
+    function setStatus(text, className) {
+        statusEl.textContent = text;
+        statusEl.className = 'status ' + className;
+    }
+
+    function addMessage(text, type) {
+        const div = document.createElement('div');
+        div.className = 'message ' + type;
+        div.textContent = text;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function addFormattedMessage(sender, text, type) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message ' + type;
+
+        const senderSpan = document.createElement('span');
+        senderSpan.className = 'sender';
+        senderSpan.textContent = sender;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+
+        msgDiv.appendChild(senderSpan);
+        msgDiv.appendChild(bubble);
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function joinRoom() {
+        myName = nameInput.value.trim();
+        myRoom = roomInput.value.trim();
+
+        if (!myName) { nameInput.focus(); return; }
+        if (!myRoom) { roomInput.focus(); return; }
+
+        joinScreen.style.display = 'none';
+        chatScreen.style.display = 'block';
+        roomLabel.textContent = myRoom;
+
+        connect();
+    }
+
+    nameInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') joinRoom();
+    });
+    roomInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') joinRoom();
+    });
+
+    function connect() {
+        const RENDER_HOST = 'rfc-6455.onrender.com';
+        const wsUrl = window.location.hostname === 'localhost'
+            ? 'ws://localhost:8765'
+            : 'wss://' + RENDER_HOST;
+
+        setStatus('Connecting', 'connecting');
+        addMessage('Connecting to ' + wsUrl + '...', 'system');
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() {
+            setStatus('Connected', 'connected');
+            ws.send('__JOIN__:' + myName + ':' + myRoom);
+            addMessage('Joined room "' + myRoom + '" as ' + myName, 'system');
+        };
+
+        ws.onmessage = function(event) {
+            const data = event.data;
+            const colonIdx = data.indexOf(':');
+            if (colonIdx > 0 && !data.startsWith('[')) {
+                const sender = data.substring(0, colonIdx);
+                const text = data.substring(colonIdx + 2);
+                addFormattedMessage(sender, text, 'received');
+            } else {
+                addMessage(data, 'system');
+            }
+        };
+
+        ws.onclose = function(event) {
+            setStatus('Disconnected', 'disconnected');
+            addMessage('Connection closed', 'system');
+            setTimeout(function() {
+                addMessage('Reconnecting...', 'system');
+                connect();
+            }, 3000);
+        };
+
+        ws.onerror = function() {
+            setStatus('Error', 'disconnected');
+            addMessage('Connection error', 'system');
+        };
+    }
+
+    function sendMessage() {
+        const text = msgInput.value.trim();
+        if (!text) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            addMessage('Not connected', 'system');
+            return;
+        }
+        ws.send(text);
+        addFormattedMessage('You', text, 'sent');
+        msgInput.value = '';
+        msgInput.focus();
+    }
+
+    msgInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
+
+</body>
+</html>
